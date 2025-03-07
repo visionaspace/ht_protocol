@@ -14,20 +14,5 @@ typedef uint32_t                              uint32;
 typedef uint64_t                              uint64;
 typedef bool                                  boolean;
 
-typedef enum {
-  BOOLEAN_DATA,
-  CHAR_DATA,
-  INT8_DATA,
-  UINT8_DATA,
-  INT16_DATA,
-  UINT16_DATA,
-  INT32_DATA,
-  UINT32_DATA,
-  INT64_DATA,
-  UINT64_DATA,
-  FLOAT_DATA,
-  DOUBLE_DATA
-} CustomTypes;
-
 #endif // COMMON_TYPES_H
 

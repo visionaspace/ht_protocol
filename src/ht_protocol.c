@@ -1,7 +1,15 @@
+#include "ht_protocol_internal.h"
+#include "ht_protocol_error.h"
+
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <inttypes.h>
 #include "ht_protocol.h"
+
+/*************************************************************************
+** Global Data Structures
+*************************************************************************/
 
 /* Mapping of ASCII characters to hex values */
 const uint8 ASCII_hashmap[] = {
@@ -39,231 +47,434 @@ const uint8 ASCII_hashmap[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // ........
 };
 
-/* This function will convert a Hexa str to the data specified and write it into varToBeWritten */
-/* It will return the bytes written */
-uint8 hexstr_converter(void* varToBeWritten, CustomTypes data_type, const char* str, uint16 data_index) {
+/**
+ * @file ht_lib.h
+ */
+int16 HT_PROTOCOL_HexstrConverter(void *VarToBeWritten, HT_PROTOCOL_CustomTypes_t DataType, const char *Str, uint16 DataIndex) {
 
-    uint8 i, bytes_length;
-    uint8 *aux_bytes = NULL;
-    char aux_str[2];
-    void *aux_ptr = NULL;
+    uint8 i, BytesLength;
+    uint8 AuxBytes[8];
+    char  AuxStr[2];
+    void *AuxPtr = NULL;
 
     /* Initialize data according to the type here */
-    switch (data_type) {
-        case INT8_DATA:
-            aux_ptr = (int8*) varToBeWritten;
-            bytes_length = 1;
-            break;
-        case UINT8_DATA:
-            aux_ptr = (uint8*) varToBeWritten;
-            bytes_length = 1;
-            break;
-        case INT16_DATA:
-            aux_ptr = (int16*) varToBeWritten;
-            bytes_length = 2;
-            break;
-        case UINT16_DATA:
-            aux_ptr = (uint16*) varToBeWritten;
-            bytes_length = 2;
-            break;
-        case INT32_DATA:
-            aux_ptr = (int32*) varToBeWritten;
-            bytes_length = 4;
-            break;
-        case UINT32_DATA:
-            aux_ptr = (uint32*) varToBeWritten;
-            bytes_length = 4;
-            break;
-        case INT64_DATA:
-            aux_ptr = (int64*) varToBeWritten;
-            bytes_length = 8;
-            break;
-        case UINT64_DATA:
-            aux_ptr = (uint64*) varToBeWritten;
-            bytes_length = 8;
-            break;
-        case FLOAT_DATA:
-            aux_ptr = (float*) varToBeWritten;
-            bytes_length = 4;
-            break;
-        case DOUBLE_DATA:
-            aux_ptr = (double*) varToBeWritten;
-            bytes_length = 8;
-            break;
+    switch (DataType) {
+#define CASE_DATA_TYPE(_type_case, _type) \
+        case _type_case: {                          \
+            AuxPtr      = (_type *) VarToBeWritten; \
+            BytesLength = sizeof(_type);            \
+            break;                                  \
+        }
+        CASE_DATA_TYPE(INT8_DATA,   int8);
+        CASE_DATA_TYPE(UINT8_DATA,  uint8);
+        CASE_DATA_TYPE(INT16_DATA,  int16);
+        CASE_DATA_TYPE(UINT16_DATA, uint16);
+        CASE_DATA_TYPE(INT32_DATA,  int32);
+        CASE_DATA_TYPE(UINT32_DATA, uint32);
+        CASE_DATA_TYPE(INT64_DATA,  int64);
+        CASE_DATA_TYPE(UINT64_DATA, uint64);
+        CASE_DATA_TYPE(FLOAT_DATA,  float);
+        CASE_DATA_TYPE(DOUBLE_DATA, double);
+#undef CASE_DATA_TYPE
         default:
-            return 0;
-            break;
-    }
-
-    /* Alloc memory to read bytes from str */
-    aux_bytes = (uint8*) malloc (bytes_length * sizeof(uint8));
-
-    /* Check if we have memory for it */
-    if ((aux_bytes == NULL) || (aux_ptr == NULL)) {
-        // TODO: Error case. failed to memalloc
-        return 0;
+            return HT_ERROR_INVALID_DATA_TYPE;
     }
 
     /* Proper bytes reading according to HT Protocol */
-    for(i=0; i<bytes_length; i++) {
-        aux_str[0] = str[data_index + (2*i)];
-        aux_str[1] = str[data_index + (2*i) + 1];
+    for (i = 0; i < BytesLength; i++) {
+        AuxStr[0] = Str[DataIndex + (2 * i)];
+        AuxStr[1] = Str[DataIndex + (2 * i) + 1];
 
         /* This is a BIG ENDIAN notation */
-        aux_bytes[(bytes_length-i-1)] = (uint8) ((ASCII_hashmap[(uint8) aux_str[0]] << 4) | ASCII_hashmap[(uint8) aux_str[1]]);
+        AuxBytes[(BytesLength - i - 1)] = (uint8) ((ASCII_hashmap[(uint8) AuxStr[0]] << 4) | ASCII_hashmap[(uint8) AuxStr[1]]);
     }
 
     /* Cast bytes read to the var expected */
-    memcpy((char*) aux_ptr, aux_bytes, bytes_length);
-
-    /* Free memory used and return */
-    if (aux_bytes!=NULL) free(aux_bytes);
+    memcpy((char *) AuxPtr, AuxBytes, BytesLength);
 
     return i;
 }
 
-/* This function will serialize a given var into str buffer as hexadecimal string */
-/* Note: This will use system default endianess */
-/*  e.g. decimal_to_hexstr(&1253775, UINT64_DATA, str) will write "000000000013218f" to str */
-uint8 decimal_to_hexstr(void *var, CustomTypes data_type, char* str) {
+/**
+ * @file ht_lib.h
+ */
+int32 HT_PROTOCOL_GetSrcId(char *Msg) {
+
+    if (Msg == NULL) {
+        return HT_ERROR_NULL_POINTER;
+    }
+
+    if (HT_PROTOCOL_IsMsgHt(Msg) == false) {
+        return HT_ERROR_NOT_HT_MSG;
+    }
+
+    char *Ptr   = (char *) Msg;
+    uint8 SrcId = 0;
+
+    /* Not handling error case for hard coded value */
+    HT_PROTOCOL_HexstrConverter(&SrcId, UINT8_DATA, Ptr, 1);
+    return SrcId;
+}
+
+/**
+ * @file ht_lib.h
+ */
+int32 HT_PROTOCOL_GetDestId(char *Msg) {
+
+    if (Msg == NULL) {
+        return HT_ERROR_NULL_POINTER;
+    }
+
+    if (HT_PROTOCOL_IsMsgHt(Msg) == false) {
+        return HT_ERROR_NOT_HT_MSG;
+    }
+
+    char *Ptr = (char *) Msg;
+
+    uint8 DestId = 0;
+
+    /* Not handling error case for hard coded value */
+    HT_PROTOCOL_HexstrConverter(&DestId, UINT8_DATA, Ptr, 3);
+    return DestId;
+}
+
+/**
+ * @file ht_lib.h
+ */
+int32 HT_PROTOCOL_GetCmdId(char *Msg) {
+
+    if (Msg == NULL) {
+        return HT_ERROR_NULL_POINTER;
+    }
+
+    if (HT_PROTOCOL_IsMsgHt(Msg) == false) {
+        return HT_ERROR_NOT_HT_MSG;
+    }
+
+    char *Ptr   = (char *) Msg;
+    uint8 CmdId = 0;
+
+    /* Not handling error case for hard coded value */
+    HT_PROTOCOL_HexstrConverter(&CmdId, UINT8_DATA, Ptr, 5);
+    return CmdId;
+}
+
+/**
+ * @file ht_lib.h
+ */
+int32 HT_PROTOCOL_GetMsgLength(char *Msg) {
+
+    if (Msg == NULL) {
+        return HT_ERROR_NULL_POINTER;
+    }
+
+    if (HT_PROTOCOL_IsMsgHt(Msg) == false) {
+        return HT_ERROR_NOT_HT_MSG;
+    }
+
+    char  *Ptr    = (char *) Msg;
+    uint16 MsgLen = 0;
+
+    /* Not handling error case for hard coded value */
+    HT_PROTOCOL_HexstrConverter(&MsgLen, UINT16_DATA, Ptr, 7);
+    return MsgLen;
+}
+
+/**
+ * @file ht_lib_internal.h
+ */
+uint8 HT_PROTOCOL_Crc8(const char *Data, size_t Len) {
+
+    uint8  Crc = 0x00;
+    uint16 i;
+
+    if (Len == 0) {
+        return Crc;
+    }
+
+    for (i = 0; i < Len; i++) {
+        Crc ^= *Data++;
+        Crc = Crc & 0x80 ? (Crc << 1) ^ 0xEB : Crc << 1;
+        Crc = Crc & 0x80 ? (Crc << 1) ^ 0xEB : Crc << 1;
+        Crc = Crc & 0x80 ? (Crc << 1) ^ 0xEB : Crc << 1;
+        Crc = Crc & 0x80 ? (Crc << 1) ^ 0xEB : Crc << 1;
+        Crc = Crc & 0x80 ? (Crc << 1) ^ 0xEB : Crc << 1;
+        Crc = Crc & 0x80 ? (Crc << 1) ^ 0xEB : Crc << 1;
+        Crc = Crc & 0x80 ? (Crc << 1) ^ 0xEB : Crc << 1;
+        Crc = Crc & 0x80 ? (Crc << 1) ^ 0xEB : Crc << 1;
+    }
+
+    return Crc;
+}
+
+/**
+ * @file ht_lib_internal.h
+ */
+int16 HT_PROTOCOL_DecimalToHexstr(void *Var, HT_PROTOCOL_CustomTypes_t DataType, char *Str) {
 
     /* Specific union for double casting to hexa */
     union {
         long long i; /* 8 bytes */
         double    d; /* 8 bytes */
-    } double_value;
+    } DoubleValue;
 
     /* Specific union for float casting to hexa */
     union {
-        long     i; /* 4 bytes */
-        float    d; /* 4 bytes */
-    } float_value;
+        uint32 i; /* 4 bytes */
+        float  d; /* 4 bytes */
+    } FloatValue;
 
-    void* aux_ptr;
-    uint8 bytes_length = 0;
+    void *AuxPtr;
+    uint8 BytesLength = 0;
 
-    switch (data_type) {
+    switch (DataType) {
         case INT8_DATA:
-            aux_ptr = (int8*) var;
+            AuxPtr = (int8 *) Var;
             /* This has to be converted to uint8 to be printed */
-            sprintf(str, "%02" PRIX8, * (uint8*) aux_ptr);
-            bytes_length = 1;
+            sprintf(Str, "%02" PRIX8, *(uint8 *) AuxPtr);
+            BytesLength = 1;
             break;
         case UINT8_DATA:
-            aux_ptr = (uint8*) var;
-            sprintf(str, "%02" PRIX8, * (uint8*) aux_ptr);
-            bytes_length = 1;
+            AuxPtr = (uint8 *) Var;
+            sprintf(Str, "%02" PRIX8, *(uint8 *) AuxPtr);
+            BytesLength = 1;
             break;
         case INT16_DATA:
-            aux_ptr = (int16*) var;
-            sprintf(str, "%04" PRIX16, * (uint16*) aux_ptr);
-            bytes_length = 2;
+            AuxPtr = (int16 *) Var;
+            sprintf(Str, "%04" PRIX16, *(uint16 *) AuxPtr);
+            BytesLength = 2;
             break;
         case UINT16_DATA:
-            aux_ptr = (uint16*) var;
-            sprintf(str, "%04" PRIX16, * (uint16*) aux_ptr);
-            bytes_length = 2;
+            AuxPtr = (uint16 *) Var;
+            sprintf(Str, "%04" PRIX16, *(uint16 *) AuxPtr);
+            BytesLength = 2;
             break;
         case INT32_DATA:
-            aux_ptr = (int32*) var;
-            sprintf(str, "%08" PRIX32, * (uint32*) aux_ptr);
-            bytes_length = 4;
+            AuxPtr = (int32 *) Var;
+            sprintf(Str, "%08" PRIX32, *(uint32 *) AuxPtr);
+            BytesLength = 4;
             break;
         case UINT32_DATA:
-            aux_ptr = (uint32*) var;
-            sprintf(str, "%08" PRIX32, * (uint32*) aux_ptr);
-            bytes_length = 4;
+            AuxPtr = (uint32 *) Var;
+            sprintf(Str, "%08" PRIX32, *(uint32 *) AuxPtr);
+            BytesLength = 4;
             break;
         case INT64_DATA:
-            aux_ptr = (int64*) var;
-            sprintf(str, "%016" PRIX64, * (uint64*) aux_ptr);
-            bytes_length = 8;
+            AuxPtr = (int64 *) Var;
+            sprintf(Str, "%016" PRIX64, *(uint64 *) AuxPtr);
+            BytesLength = 8;
             break;
         case UINT64_DATA:
-            aux_ptr = (uint64*) var;
-            sprintf(str, "%016" PRIX64, * (uint64*) aux_ptr);
-            bytes_length = 8;
+            AuxPtr = (uint64 *) Var;
+            sprintf(Str, "%016" PRIX64, *(uint64 *) AuxPtr);
+            BytesLength = 8;
             break;
         case FLOAT_DATA:
-            aux_ptr = (float*) var;
-            float_value.d = * (float*) aux_ptr;
-            sprintf(str, "%08lX", float_value.i);
-            bytes_length = 4;
+            AuxPtr       = (float *) Var;
+            FloatValue.d = *(float *) AuxPtr;
+            sprintf(Str, "%08" PRIX32, FloatValue.i);
+            BytesLength = 4;
             break;
         case DOUBLE_DATA:
-            aux_ptr = (double*) var;
-            double_value.d = * (double*) aux_ptr;
-            sprintf(str, "%016llX", double_value.i);
-            bytes_length = 8;
+            AuxPtr        = (double *) Var;
+            DoubleValue.d = *(double *) AuxPtr;
+            sprintf(Str, "%016llX", DoubleValue.i);
+            BytesLength = 8;
             break;
         default:
-            // /* Invalid data_type */
-            return 0;
-            break;
+            return HT_ERROR_INVALID_DATA_TYPE;
     }
 
-    return bytes_length*2;
+    return BytesLength * 2;
 }
 
-/* This function will insert the CRC symbol into str input */
-/*  and will return 1 (char written) */
-uint8 insert_crc_symbol(char *str) {
+/**
+ * @file ht_lib_internal.h
+ */
+bool HT_PROTOCOL_IsMsgHt(void *Msg) {
 
-    sprintf(str, "%c", HT_CRC_CHAR);
-    return 1;
+    if (Msg == NULL) {
+        return false;
+    }
+    char *Ptr = (char *) Msg;
+
+    return Ptr[0] == HT_HW_START_CHAR;
 }
 
-/* This function will calculate the CRC for HT Protocol */
-/* It requires the string to be without the first char "$" until the crc char ":" */
-/*  e.g. HT_crc8('01023100:', 9) = 0x7F */
-uint8 HT_crc8(const char *data, uint16 len) {
+/**
+ * @file ht_lib_internal.h
+ */
+size_t HT_PROTOCOL_DecBytes(void *DecodedMsg, void *Msg, size_t NumOfBytes) {
 
-    uint8 crc = 0x00;
-    uint16 i;
-
-    if (len == 0) {
-        return crc;
+    if (Msg == NULL) {
+        return HT_ERROR_NULL_POINTER;
     }
 
-    for (i=0; i<len; i++) {
-        crc ^= *data++;
-        crc = crc & 0x80 ? (crc << 1) ^ 0xEB : crc << 1;
-        crc = crc & 0x80 ? (crc << 1) ^ 0xEB : crc << 1;
-        crc = crc & 0x80 ? (crc << 1) ^ 0xEB : crc << 1;
-        crc = crc & 0x80 ? (crc << 1) ^ 0xEB : crc << 1;
-        crc = crc & 0x80 ? (crc << 1) ^ 0xEB : crc << 1;
-        crc = crc & 0x80 ? (crc << 1) ^ 0xEB : crc << 1;
-        crc = crc & 0x80 ? (crc << 1) ^ 0xEB : crc << 1;
-        crc = crc & 0x80 ? (crc << 1) ^ 0xEB : crc << 1;
+    if (DecodedMsg == NULL) {
+        return HT_ERROR_NULL_POINTER;
     }
 
-    return crc;
-} /* End of HT_crc8() */
+    char *dPtr  = (char *) Msg;
+    int   Index = 0;
 
-
-/* This function will prepend the start byte and the end byte of data, */
-/*  according to HT Protocol */
-void HT_write(const char *data, uint16 data_length) {
-
-    char *tx_buff = NULL;
-
-    if (data == NULL || data_length <= 10) {
-        return;
+    for (int i = 0; i < NumOfBytes; i += 2) {
+        /* Not handling error case for hard coded value */
+        Index += HT_PROTOCOL_HexstrConverter((char *) DecodedMsg + Index, UINT8_DATA, dPtr, i);
     }
 
-    tx_buff = (char*) malloc((data_length+2) * sizeof(char));
-    if (tx_buff == NULL) {
-        return;
-    }
-
-    sprintf(tx_buff, "%c", HT_HW_START_CHAR);
-    sprintf(tx_buff+1, "%s", data);
-    sprintf(tx_buff+1+data_length, "%c", HT_HW_END_CHAR);
-
-    /* Send to serial */
-    //serialWrite(globalData.serial_fd, tx_buff, data_length+2);
-    printf("%s\n", tx_buff);
-
-    /* Free memory used */
-    if (tx_buff != NULL) free(tx_buff);
+    return Index;
 }
+
+/**
+ * @file ht_lib_internal.h
+ */
+size_t HT_PROTOCOL_EncBytes(char *EncodedMsg, void *Data, size_t NumOfBytes) {
+
+    if (EncodedMsg == NULL || Data == NULL) {
+        return 0;
+    }
+
+    char *DataPtr = (char *) Data;
+    int   Index   = 0;
+
+    for (int i = 0; i < NumOfBytes; i++) {
+        /* Not handling error case for hard coded value */
+        Index += HT_PROTOCOL_DecimalToHexstr(DataPtr + i, UINT8_DATA, EncodedMsg + Index);
+    }
+
+    return Index;
+}
+
+/**
+ * @file ht_lib.h
+ */
+int32 HT_PROTOCOL_InitMsg(HT_PROTOCOL_Msg_t *Msg, uint8 SrcId, uint8 DestId, uint8 CmdId, uint16 PayloadSize, void *Payload, bool UseCrc) {
+
+    if (Msg == NULL) {
+        return HT_ERROR_NULL_POINTER;
+    }
+
+    Msg->Header.SrcId      = SrcId;
+    Msg->Header.DestId     = DestId;
+    Msg->Header.CmdId      = CmdId;
+    Msg->Header.DataLength = PayloadSize;
+
+    Msg->Data = Payload;
+
+    Msg->UseCrc = UseCrc;
+
+    if (UseCrc) {
+        Msg->CrcValue = HT_PROTOCOL_Crc8((char *) Payload, PayloadSize);
+    } else {
+        Msg->CrcValue = 0;
+    }
+
+    return HT_STATUS_SUCCESS;
+}
+
+/**
+ * @file ht_lib.h
+ */
+int32 HT_PROTOCOL_EncodeMsg(char *EncodedMsg, HT_PROTOCOL_Msg_t *Msg) {
+
+    if (Msg == NULL) {
+        return HT_ERROR_NULL_POINTER;
+    }
+
+    uint16 Index   = 0;
+    char  *Encoded = EncodedMsg;
+
+    Index += sprintf(Encoded, "%c", HT_HW_START_CHAR);
+    /* Not handling error case for hard coded value */
+    Index += HT_PROTOCOL_DecimalToHexstr((void *) &Msg->Header.SrcId, UINT8_DATA, Encoded + Index);
+    Index += HT_PROTOCOL_DecimalToHexstr((void *) &Msg->Header.DestId, UINT8_DATA, Encoded + Index);
+    Index += HT_PROTOCOL_DecimalToHexstr((void *) &Msg->Header.CmdId, UINT8_DATA, Encoded + Index);
+    Index += HT_PROTOCOL_DecimalToHexstr((void *) &Msg->Header.DataLength, UINT16_DATA, Encoded + Index);
+
+    Index += HT_PROTOCOL_EncBytes(Encoded + Index, Msg->Data, Msg->Header.DataLength);
+
+    if (Msg->UseCrc) {
+        Index += sprintf(&Encoded[Index], "%c", HT_CRC_CHAR);
+        /* Not handling error case for hard coded value */
+        Index += HT_PROTOCOL_DecimalToHexstr((void *) &Msg->CrcValue, UINT8_DATA, Encoded + Index);
+    }
+
+    Index += sprintf(&Encoded[Index], "%c", HT_HW_END_CHAR);
+
+    return Index;
+}
+
+/*
+ * @file ht_lib.h
+ */
+int32 HT_PROTOCOL_DecodeMsg(HT_PROTOCOL_Msg_t *DecodedMsg, void *DecodedPayload, size_t DecodedPayloadSize, char *EncodedMsg) {
+
+    size_t Index = 0;
+
+    if (EncodedMsg == NULL || DecodedPayload == NULL || DecodedMsg == NULL) {
+        return HT_ERROR_NULL_POINTER;
+    }
+
+    if (!HT_PROTOCOL_IsMsgHt(EncodedMsg)) {
+        return HT_ERROR_NOT_HT_MSG;
+    }
+
+    Index = 1;
+
+    /* Not handling error case for hard coded value */
+    Index += 2 * HT_PROTOCOL_HexstrConverter(&DecodedMsg->Header.SrcId, UINT8_DATA, EncodedMsg + Index, 0);
+    Index += 2 * HT_PROTOCOL_HexstrConverter(&DecodedMsg->Header.DestId, UINT8_DATA, EncodedMsg + Index, 0);
+    Index += 2 * HT_PROTOCOL_HexstrConverter(&DecodedMsg->Header.CmdId, UINT8_DATA, EncodedMsg + Index, 0);
+    Index += 2 * HT_PROTOCOL_HexstrConverter(&DecodedMsg->Header.DataLength, UINT16_DATA, EncodedMsg + Index, 0);
+
+    /* Not enough bytes were allocated */
+    if (DecodedPayloadSize < DecodedMsg->Header.DataLength) {
+        return HT_ERROR_WRONG_MSG_LENGTH;
+    }
+
+    DecodedMsg->Data = DecodedPayload;
+    Index += 2 * HT_PROTOCOL_DecBytes(DecodedMsg->Data, EncodedMsg + Index, DecodedMsg->Header.DataLength * 2);
+    DecodedMsg->UseCrc = (EncodedMsg[Index] == HT_CRC_CHAR);
+
+    if (DecodedMsg->UseCrc) {
+        Index += 1;
+        /* Not handling error case for hard coded value */
+        Index += 2 * HT_PROTOCOL_HexstrConverter(&DecodedMsg->CrcValue, UINT8_DATA, EncodedMsg + Index, 0);
+
+        if (DecodedMsg->CrcValue != HT_PROTOCOL_Crc8((char *) DecodedMsg->Data, DecodedMsg->Header.DataLength)) {
+            return HT_ERROR_CRC;
+        }
+    }
+
+    if (EncodedMsg[Index] != HT_HW_END_CHAR) {
+        return HT_ERROR_WRONG_END_CHAR;
+    }
+
+    return Index;
+}
+
+/**
+ * @file ht_lib.h
+ */
+int32 HT_PROTOCOL_DecodePayload(void *DecodedPayload, size_t DecodedPayloadSize, char *EncodedMsg) {
+
+    size_t Index = 0;
+
+    if (EncodedMsg == NULL || DecodedPayload == NULL) {
+        return HT_ERROR_NULL_POINTER;
+    }
+
+    if (!HT_PROTOCOL_IsMsgHt(EncodedMsg)) {
+        return HT_ERROR_NOT_HT_MSG;
+    }
+
+    if (HT_PROTOCOL_GetMsgLength(EncodedMsg) > DecodedPayloadSize) {
+        return HT_ERROR_WRONG_MSG_LENGTH;
+    }
+
+    HT_PROTOCOL_Msg_t DecodedMsg;
+    Index = HT_PROTOCOL_DecodeMsg(&DecodedMsg, DecodedPayload, DecodedPayloadSize, EncodedMsg);
+
+    return Index;
+}
+
