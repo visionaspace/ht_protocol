@@ -12,41 +12,57 @@
 
 pthread_mutex_t IOMutex;
 
-#define NOTIFY(_format, ...) \
+#define WRITE_TASK_NOTIFY(_format, ...) \
 {                                       \
     pthread_mutex_lock(&IOMutex);       \
     VLOG_NOTIFY(_format, ##__VA_ARGS__);\
     pthread_mutex_unlock(&IOMutex);     \
 }                                       \
 
-const char *SerialPort = "/dev/pts/6";
+#define READ_TASK_NOTIFY(_format, ...)  \
+{                                       \
+    pthread_mutex_lock(&IOMutex);       \
+    VLOG_CMD(_format, ##__VA_ARGS__);   \
+    pthread_mutex_unlock(&IOMutex);     \
+}                                       \
 
-void ReadTask(void *Arg) {
+#define MAX_FOR(type) (1 << sizeof(type))
+
+#define SAFE_INCR(var) var = (var == MAX_FOR(var)) ? 1 : var + 1
+
+#define SEND_MSG(Payload, Scope) \
+{                                                                                       \
+    char EncodedMessage[HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload0))];               \
+    {Scope};                                                                            \
+    HT_PROTOCOL_InitMsg(&Message, 1, 2, 3, sizeof(Payload0), (void *) &Payload0, true); \
+    HT_PROTOCOL_EncodeMsg(EncodedMessage, &Message);                                    \
+    serialWrite(Fd, EncodedMessage, HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload0)));   \
+    WRITE_TASK_NOTIFY("Wrote message = %s", EncodedMessage);                            \
+}                                                                                       \
+
+const char *SerialPort = "/dev/pts/3";
+
+void ReadTask(void) {
 
     int32 bytes_read = 0;
     static char Buffer[HT_MAX_MESSAGE_BYTES];
 
-    printf("Starting read_serial task\n");
+    int32 Fd = serialOpen(SerialPort);
 
     while(1) {
-
-        // Removed globalData here
-        //bytes_read = serialRead(globalData.serial_fd, str_buffer, HT_HW_START_CHAR, HT_HW_END_CHAR, 0, HT_MAX_MESSAGE_BYTES);
-        /* bytes_read = serialRead(0, Buffer, HT_HW_START_CHAR, HT_HW_END_CHAR, 0, HT_MAX_MESSAGE_BYTES);
+        bytes_read = serialRead(Fd, Buffer, HT_HW_START_CHAR, HT_HW_END_CHAR, 0, HT_MAX_MESSAGE_BYTES);
 
         if (bytes_read <= 0) {
-            printf("Error reading serial\n");
-        } else { */
-            /* Message read. Process it */
-            //process_read_msg(str_buffer, (uint16) bytes_read);
-        // }
-        // NOTIFY("Read Task running\n");
-        // VLOG_NOTIFY("Read Task running\n");
-        usleep(1000000);
+            // printf("Error reading serial\n");
+        } else {
+            READ_TASK_NOTIFY("Received message = %s", Buffer);
+        }
+        READ_TASK_NOTIFY("Read Task running\n");
+        usleep(500000);
     }
 }
 
-void WriteTask(void *Args) {
+void WriteTask(void) {
 
     typedef struct {
         uint8  Info;
@@ -63,7 +79,7 @@ void WriteTask(void *Args) {
         uint8 ControlBits;
     } PayloadExample2_t;
 
-    PayloadExample0_t Payload0 = {.Info = 0x01, .Data = 0x02, .Temp = 0x03, .Pressure = 0x04};
+    PayloadExample0_t Payload0 = {.Info = 0x01};
     PayloadExample1_t Payload1 = {.Measure = 0x05};
     PayloadExample2_t Payload2 = {.ControlBits = 0x06};
 
@@ -72,47 +88,35 @@ void WriteTask(void *Args) {
     int32 Fd = serialOpen(SerialPort);
 
     while(1) {
-
-        Payload0.Info += 1;
-        char EncodedMessage[HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload0))];
-        HT_PROTOCOL_InitMsg(&Message, 1, 2, 3, sizeof(Payload0), (void *) &Payload0, true);
-        HT_PROTOCOL_EncodeMsg(EncodedMessage, &Message);
-        serialWrite(Fd, EncodedMessage, HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload0)));
-
         int32 PayloadNum = rand() % 3;
 
         switch(PayloadNum) {
-            case 5: {
-                Payload0.Info += 1;
-                char EncodedMessage[HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload0))];
-                HT_PROTOCOL_InitMsg(&Message, 1, 2, 3, sizeof(Payload0), (void *) &Payload0, true);
-                HT_PROTOCOL_EncodeMsg(EncodedMessage, &Message);
-                serialWrite(Fd, EncodedMessage, HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload0)));
+            case 0: {
+                SEND_MSG(Payload0, {
+                    SAFE_INCR(Payload0.Info);
+                    SAFE_INCR(Payload0.Data);
+                    SAFE_INCR(Payload0.Temp);
+                    Payload0.Pressure += 0.1;
+                });
                 break;
             }
-            /* case 1: {
-                Payload1.Measure += 0.1;
-                char EncodedMessage[HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload0))];
-                HT_PROTOCOL_InitMsg(&Message, 1, 2, 3, sizeof(Payload1), (void *) &Payload1, true);
-                HT_PROTOCOL_EncodeMsg(EncodedMessage, &Message);
-                serialWrite(Fd, EncodedMessage, HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload1)));
+            case 1: {
+                SEND_MSG(Payload1, {
+                    Payload1.Measure += 0.1;
+                });
                 break;
             }
             case 2: {
-                Payload2.ControlBits += 1;
-                char EncodedMessage[HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload0))];
-                HT_PROTOCOL_InitMsg(&Message, 1, 2, 3, sizeof(Payload2), (void *) &Payload2, true);
-                HT_PROTOCOL_EncodeMsg(EncodedMessage, &Message);
-                serialWrite(Fd, EncodedMessage, HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload2)));
+                SEND_MSG(Payload2, {
+                    SAFE_INCR(Payload2.ControlBits);
+                });
                 break;
-            } */
+            }
             default:
                 break;
         }
 
-        // NOTIFY("Write Task running\n");
-
-        usleep(1000000);
+        usleep(500000);
     }
 }
 
@@ -137,7 +141,7 @@ int main(void) {
     pthread_join(WriteTaskThread, NULL);
 
     while(1) {
-        usleep(1000);
+        usleep(100000000);
     }
 
     return 0;
