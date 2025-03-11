@@ -317,7 +317,7 @@ size_t HT_PROTOCOL_DecBytes(void *DecodedMsg, void *Msg, size_t NumOfBytes) {
     char *dPtr  = (char *) Msg;
     int   Index = 0;
 
-    for (int i = 0; i < NumOfBytes; i += 2) {
+    for (size_t i = 0; i < NumOfBytes; i += 2) {
         /* Not handling error case for hard coded value */
         Index += HT_PROTOCOL_HexstrConverter((char *) DecodedMsg + Index, UINT8_DATA, dPtr, i);
     }
@@ -337,7 +337,7 @@ size_t HT_PROTOCOL_EncBytes(char *EncodedMsg, void *Data, size_t NumOfBytes) {
     char *DataPtr = (char *) Data;
     int   Index   = 0;
 
-    for (int i = 0; i < NumOfBytes; i++) {
+    for (size_t i = 0; i < NumOfBytes; i++) {
         /* Not handling error case for hard coded value */
         Index += HT_PROTOCOL_DecimalToHexstr(DataPtr + i, UINT8_DATA, EncodedMsg + Index);
     }
@@ -468,7 +468,7 @@ int32 HT_PROTOCOL_DecodePayload(void *DecodedPayload, size_t DecodedPayloadSize,
         return HT_ERROR_NOT_HT_MSG;
     }
 
-    if (HT_PROTOCOL_GetMsgLength(EncodedMsg) > DecodedPayloadSize) {
+    if ((size_t) HT_PROTOCOL_GetMsgLength(EncodedMsg) > DecodedPayloadSize) {
         return HT_ERROR_WRONG_MSG_LENGTH;
     }
 

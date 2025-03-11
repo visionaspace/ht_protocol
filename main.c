@@ -30,19 +30,31 @@ pthread_mutex_t IOMutex;
 
 #define SAFE_INCR(var) var = (var == MAX_FOR(var)) ? 1 : var + 1
 
-#define SEND_MSG(Payload, Scope) \
-{                                                                                       \
-    char EncodedMessage[HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload0))];               \
-    {Scope};                                                                            \
-    HT_PROTOCOL_InitMsg(&Message, 1, 2, 3, sizeof(Payload0), (void *) &Payload0, true); \
-    HT_PROTOCOL_EncodeMsg(EncodedMessage, &Message);                                    \
-    serialWrite(Fd, EncodedMessage, HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload0)));   \
-    WRITE_TASK_NOTIFY("Wrote message = %s", EncodedMessage);                            \
-}                                                                                       \
+#define SEND_MSG(Payload, CmdId, Scope) \
+{                                                                                          \
+    char EncodedMessage[HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload))];                   \
+    {Scope};                                                                               \
+    HT_PROTOCOL_InitMsg(&Message, 1, 2, CmdId, sizeof(Payload), (void *) &Payload, true); \
+    HT_PROTOCOL_EncodeMsg(EncodedMessage, &Message);                                       \
+    serialWrite(Fd, EncodedMessage, HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload)));       \
+    WRITE_TASK_NOTIFY("Wrote message for (%s) = %s", #Payload, EncodedMessage);            \
+}                                                                                          \
 
-const char *SerialPort = "/dev/pts/3";
+const char *SerialPort = "/dev/pts/9";
 
 void ReadTask(void) {
+
+    typedef struct __attribute__((packed)) {
+        uint8  Data;
+        uint16 Info;
+        uint8  Signal;
+    } PayloadCmdExample0_t;
+
+    typedef struct __attribute__((packed)) {
+        uint16 Data;
+        uint16 Info;
+        double Signal;
+    } PayloadCmdExample1_t;
 
     int32 bytes_read = 0;
     static char Buffer[HT_MAX_MESSAGE_BYTES];
@@ -50,20 +62,50 @@ void ReadTask(void) {
     int32 Fd = serialOpen(SerialPort);
 
     while(1) {
-        bytes_read = serialRead(Fd, Buffer, HT_HW_START_CHAR, HT_HW_END_CHAR, 0, HT_MAX_MESSAGE_BYTES);
+        // bytes_read = serialRead(Fd, Buffer, HT_HW_START_CHAR, HT_HW_END_CHAR, 0, HT_MAX_MESSAGE_BYTES);
+        bytes_read = serialRead(Fd, Buffer, HT_HW_START_CHAR, HT_HW_END_CHAR, SERIAL_INCLUDE_MARKETS, HT_MAX_MESSAGE_BYTES);
 
         if (bytes_read <= 0) {
-            // printf("Error reading serial\n");
+            // READ_TASK_NOTIFY("Error reading serial\n");
         } else {
-            READ_TASK_NOTIFY("Received message = %s", Buffer);
+            /* int32 SrcId = HT_PROTOCOL_GetSrcId(Buffer);
+            int32 DestId = HT_PROTOCOL_GetDestId(Buffer);
+            int32 DataLength = HT_PROTOCOL_GetMsgLength(Buffer); */
+
+            // int32 CmdId = HT_PROTOCOL_GetCmdId(Buffer);
+
+#define RECEIVE_MSG(PayloadType, CmdId, Scope) \
+{                                                                           \
+        HT_PROTOCOL_Msg_t Message;                                          \
+        PayloadType Payload;                                                \
+        HT_PROTOCOL_DecodeMsg(&Message, &Payload, sizeof(Payload), Buffer); \
+        {Scope}                                                             \
+}                                                                           \
+
+            switch(HT_PROTOCOL_GetCmdId(Buffer)) {
+                case 0: {
+                    RECEIVE_MSG(PayloadCmdExample0_t, 0, {
+                        READ_TASK_NOTIFY("Payload0 = (%u, %u, %u)\n", Payload.Data, Payload.Info, Payload.Signal);
+                    });
+                    break;
+                }
+                case 1: {
+                    RECEIVE_MSG(PayloadCmdExample1_t, 1, {
+                        READ_TASK_NOTIFY("Payload1 = (%u, %u, %lf)\n", Payload.Data, Payload.Info, Payload.Signal);
+                    });
+                    break;
+                }
+                default:
+                    break;
+            }
         }
-        READ_TASK_NOTIFY("Read Task running\n");
         usleep(500000);
     }
 }
 
 void WriteTask(void) {
 
+    #define PAYLOAD_0_CMD_ID 0
     typedef struct {
         uint8  Info;
         uint8  Data;
@@ -71,10 +113,12 @@ void WriteTask(void) {
         float  Pressure;
     } PayloadExample0_t;
 
+    #define PAYLOAD_1_CMD_ID 1
     typedef struct {
         double Measure;
     } PayloadExample1_t;
 
+    #define PAYLOAD_2_CMD_ID 2
     typedef struct {
         uint8 ControlBits;
     } PayloadExample2_t;
@@ -88,35 +132,35 @@ void WriteTask(void) {
     int32 Fd = serialOpen(SerialPort);
 
     while(1) {
-        int32 PayloadNum = rand() % 3;
 
-        switch(PayloadNum) {
-            case 0: {
-                SEND_MSG(Payload0, {
-                    SAFE_INCR(Payload0.Info);
-                    SAFE_INCR(Payload0.Data);
-                    SAFE_INCR(Payload0.Temp);
-                    Payload0.Pressure += 0.1;
-                });
-                break;
+        for (uint32 PayloadNum = 0; PayloadNum < 3; PayloadNum++) {
+            switch(PayloadNum) {
+                case PAYLOAD_0_CMD_ID: {
+                    SEND_MSG(Payload0, PAYLOAD_0_CMD_ID, {
+                        SAFE_INCR(Payload0.Info);
+                        SAFE_INCR(Payload0.Data);
+                        SAFE_INCR(Payload0.Temp);
+                        Payload0.Pressure += 0.1;
+                    });
+                   break;
+                }
+                case PAYLOAD_1_CMD_ID: {
+                    SEND_MSG(Payload1, PAYLOAD_1_CMD_ID, {
+                        Payload1.Measure += 0.1;
+                    });
+                   break;
+                }
+                case PAYLOAD_2_CMD_ID: {
+                    SEND_MSG(Payload2, PAYLOAD_2_CMD_ID, {
+                        SAFE_INCR(Payload2.ControlBits);
+                    });
+                    break;
+                }
+                default:
+                    break;
             }
-            case 1: {
-                SEND_MSG(Payload1, {
-                    Payload1.Measure += 0.1;
-                });
-                break;
-            }
-            case 2: {
-                SEND_MSG(Payload2, {
-                    SAFE_INCR(Payload2.ControlBits);
-                });
-                break;
-            }
-            default:
-                break;
+            usleep(500000);
         }
-
-        usleep(500000);
     }
 }
 
