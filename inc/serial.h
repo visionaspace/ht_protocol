@@ -32,5 +32,6 @@ int32 serialInit(const char *serial_port, int32 baudRate, int32 timeout, int32 m
 int32 serialWrite(int32 fd, char *msg, int32 size);
 int32 serialRead(int32 fd, char *buffer, char start_byte, char end_byte, uint8 include_markers, uint16 max_read_size);
 int32 serialClose(int32 fd);
+int32 serialOpen(const char *SerialPort);
 
 #endif // READSERIAL_H
