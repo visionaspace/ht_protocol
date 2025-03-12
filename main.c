@@ -144,12 +144,12 @@ int main(void) {
     pthread_t ReadTaskThread, WriteTaskThread;
 
     if (pthread_create(&ReadTaskThread, NULL, (void *)&ReadTask, NULL) != 0) {
-        printf("Error creating read task\n");
+        perror("Error creating read task\n");
         return -1;
     }
 
     if (pthread_create(&WriteTaskThread, NULL, (void *)&WriteTask, NULL) != 0) {
-        printf("Error creating write task\n");
+        perror("Error creating write task\n");
         return -1;
     }
 
