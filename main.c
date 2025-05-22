@@ -11,7 +11,7 @@
 #include "vlog.h"
 #include "helpers.h"
 
-const char *SerialPort = "/dev/pts/3";
+const char *SerialPort = "/dev/your_device";
 
 void ReadTask(void) {
 
@@ -49,7 +49,7 @@ void ReadTask(void) {
 
                 case CMD_PAYLOAD_EXAMPLE_0_CMD_ID: {
                     RECEIVE_MSG(CmdPayloadExample0_t, CMD_PAYLOAD_EXAMPLE_0_CMD_ID, {
-                        READ_TASK_NOTIFY("Payload1 = (%u, %u, %lu)\n", Payload.Data, Payload.Info, Payload.Signal);
+                        READ_TASK_NOTIFY("Payload0 = (%u, %u, %u)\n", Payload.Data, Payload.Info, Payload.Signal);
                     });
                     break;
                 }
