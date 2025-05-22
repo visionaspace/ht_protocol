@@ -358,16 +358,9 @@ int32 HT_PROTOCOL_InitMsg(HT_PROTOCOL_Msg_t *Msg, uint8 SrcId, uint8 DestId, uin
     Msg->Header.DestId     = DestId;
     Msg->Header.CmdId      = CmdId;
     Msg->Header.DataLength = PayloadSize;
-
     Msg->Data = Payload;
-
     Msg->UseCrc = UseCrc;
-
-    if (UseCrc) {
-        Msg->CrcValue = HT_PROTOCOL_Crc8((char *) Payload, PayloadSize);
-    } else {
-        Msg->CrcValue = 0;
-    }
+    Msg->CrcValue = 0;
 
     return HT_STATUS_SUCCESS;
 }
@@ -396,6 +389,7 @@ int32 HT_PROTOCOL_EncodeMsg(char *EncodedMsg, HT_PROTOCOL_Msg_t *Msg) {
     if (Msg->UseCrc) {
         Index += sprintf(&Encoded[Index], "%c", HT_CRC_CHAR);
         /* Not handling error case for hard coded value */
+        Msg->CrcValue = HT_PROTOCOL_Crc8(Encoded + 1,  Index - 1);
         Index += HT_PROTOCOL_DecimalToHexstr((void *) &Msg->CrcValue, UINT8_DATA, Encoded + Index);
     }
 
@@ -438,10 +432,11 @@ int32 HT_PROTOCOL_DecodeMsg(HT_PROTOCOL_Msg_t *DecodedMsg, void *DecodedPayload,
 
     if (DecodedMsg->UseCrc) {
         Index += 1;
+        /* Ignore start byte ('$'), end byte and 2 bytes for encoded CRC */
+        uint8 CalculatedCrc = HT_PROTOCOL_Crc8(EncodedMsg + 1, HT_PROTOCOL_CALC_ENCODED_SIZE(DecodedMsg->Header.DataLength) - 4);
         /* Not handling error case for hard coded value */
         Index += 2 * HT_PROTOCOL_HexstrConverter(&DecodedMsg->CrcValue, UINT8_DATA, EncodedMsg + Index, 0);
-
-        if (DecodedMsg->CrcValue != HT_PROTOCOL_Crc8((char *) DecodedMsg->Data, DecodedMsg->Header.DataLength)) {
+        if (DecodedMsg->CrcValue != CalculatedCrc) {
             return HT_ERROR_CRC;
         }
     }
