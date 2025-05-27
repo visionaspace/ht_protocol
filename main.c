@@ -11,7 +11,7 @@
 #include "vlog.h"
 #include "helpers.h"
 
-const char *SerialPort = "/dev/your_device";
+const char *SerialPort = "/dev/pts/3";
 
 void ReadTask(void) {
 
