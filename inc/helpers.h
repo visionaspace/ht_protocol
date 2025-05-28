@@ -37,6 +37,7 @@ pthread_mutex_t IOMutex;
         PayloadType Payload;                                                \
         HT_PROTOCOL_DecodeMsg(&Message, &Payload, sizeof(Payload), Buffer); \
         {Scope}                                                             \
+        READ_TASK_NOTIFY("Message.CrcValue = %u, Buffer = %s", Message.CrcValue, Buffer); \
 }                                                                           \
 
 #endif

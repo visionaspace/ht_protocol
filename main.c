@@ -36,6 +36,11 @@ void ReadTask(void) {
         float Signal;
     } CmdPayloadExample2_t;
 
+#define CMD_PAYLOAD_EXAMPLE_3_CMD_ID 3
+    typedef struct __attribute__((packed)) {
+        int16 Data;
+    } CmdPayloadExample3_t;
+
     int32 bytes_read = 0;
 
     static char Buffer[HT_MAX_MESSAGE_BYTES];
@@ -64,6 +69,13 @@ void ReadTask(void) {
                 case CMD_PAYLOAD_EXAMPLE_2_CMD_ID: {
                     RECEIVE_MSG(CmdPayloadExample2_t, CMD_PAYLOAD_EXAMPLE_2_CMD_ID, {
                         READ_TASK_NOTIFY("Payload2 = (%s, %f)\n", Payload.Data, Payload.Signal);
+                    });
+                    break;
+                }
+
+                case CMD_PAYLOAD_EXAMPLE_3_CMD_ID: {
+                    RECEIVE_MSG(CmdPayloadExample3_t, CMD_PAYLOAD_EXAMPLE_3_CMD_ID, {
+                        READ_TASK_NOTIFY("Payload3 = (%d)\n", Payload.Data);
                     });
                     break;
                 }
