@@ -28,7 +28,7 @@ pthread_mutex_t IOMutex;
     HT_PROTOCOL_InitMsg(&Message, 1, 2, CmdId, sizeof(Payload), (void *) &Payload, true);  \
     HT_PROTOCOL_EncodeMsg(EncodedMessage, &Message);                                       \
     serialWrite(Fd, EncodedMessage, HT_PROTOCOL_CALC_ENCODED_SIZE(sizeof(Payload)));       \
-    WRITE_TASK_NOTIFY("Wrote (%s) = %s", #Payload, EncodedMessage);                        \
+    WRITE_TASK_NOTIFY("Wrote (%s), with crc = %u,  %s", #Payload, Message.CrcValue, EncodedMessage);                        \
 }                                                                                          \
 
 #define RECEIVE_MSG(PayloadType, CmdId, Scope) \
@@ -37,6 +37,7 @@ pthread_mutex_t IOMutex;
         PayloadType Payload;                                                \
         HT_PROTOCOL_DecodeMsg(&Message, &Payload, sizeof(Payload), Buffer); \
         {Scope}                                                             \
+        READ_TASK_NOTIFY("Message.CrcValue = %u, Buffer = %s", Message.CrcValue, Buffer); \
 }                                                                           \
 
 #endif

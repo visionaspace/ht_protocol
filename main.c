@@ -36,6 +36,11 @@ void ReadTask(void) {
         float Signal;
     } CmdPayloadExample2_t;
 
+#define CMD_PAYLOAD_EXAMPLE_3_CMD_ID 3
+    typedef struct __attribute__((packed)) {
+        int16 Data;
+    } CmdPayloadExample3_t;
+
     int32 bytes_read = 0;
 
     static char Buffer[HT_MAX_MESSAGE_BYTES];
@@ -44,26 +49,33 @@ void ReadTask(void) {
 
     while(1) {
         bytes_read = serialRead(Fd, Buffer, HT_HW_START_CHAR, HT_HW_END_CHAR, SERIAL_INCLUDE_MARKETS, HT_MAX_MESSAGE_BYTES);
-
-        if (bytes_read <= 0) {
-            // READ_TASK_NOTIFY(No bytes read on serial device\n");
-        } else {
+        if (bytes_read > 0) {
             switch(HT_PROTOCOL_GetCmdId(Buffer)) {
+
                 case CMD_PAYLOAD_EXAMPLE_0_CMD_ID: {
                     RECEIVE_MSG(CmdPayloadExample0_t, CMD_PAYLOAD_EXAMPLE_0_CMD_ID, {
                         READ_TASK_NOTIFY("Payload0 = (%u, %u, %u)\n", Payload.Data, Payload.Info, Payload.Signal);
                     });
                     break;
                 }
+
                 case CMD_PAYLOAD_EXAMPLE_1_CMD_ID: {
                     RECEIVE_MSG(CmdPayloadExample1_t, CMD_PAYLOAD_EXAMPLE_1_CMD_ID, {
                         READ_TASK_NOTIFY("Payload1 = (%u, %u, %lf)\n", Payload.Data, Payload.Info, Payload.Signal);
                     });
                     break;
                 }
+
                 case CMD_PAYLOAD_EXAMPLE_2_CMD_ID: {
                     RECEIVE_MSG(CmdPayloadExample2_t, CMD_PAYLOAD_EXAMPLE_2_CMD_ID, {
                         READ_TASK_NOTIFY("Payload2 = (%s, %f)\n", Payload.Data, Payload.Signal);
+                    });
+                    break;
+                }
+
+                case CMD_PAYLOAD_EXAMPLE_3_CMD_ID: {
+                    RECEIVE_MSG(CmdPayloadExample3_t, CMD_PAYLOAD_EXAMPLE_3_CMD_ID, {
+                        READ_TASK_NOTIFY("Payload3 = (%d)\n", Payload.Data);
                     });
                     break;
                 }
@@ -116,22 +128,25 @@ void WriteTask(void) {
                     });
                    break;
                 }
+
                 case TLM_PAYLOAD_EXAMPLE_1_CMD_ID: {
                     SEND_MSG(Payload1, TLM_PAYLOAD_EXAMPLE_1_CMD_ID, {
                         Payload1.Measure += 0.1;
                     });
                    break;
                 }
+
                 case TLM_PAYLOAD_EXAMPLE_2_CMD_ID: {
                     SEND_MSG(Payload2, TLM_PAYLOAD_EXAMPLE_2_CMD_ID, {
                         SAFE_INCR(Payload2.ControlBits);
                     });
                     break;
                 }
+
                 default:
                     break;
             }
-            usleep(500000);
+            usleep(1000000);
         }
     }
 }
