@@ -62,3 +62,14 @@ void function(void) {
 }
 
 ```
+
+## Cross-compiling
+Set the `CROSS_PREFIX` variable to the cross-compiler toolchain:
+```
+make build CROSS_PREFIX=arm-linux-gnueabihf-
+```
+
+If you want to only generate the `.a` file, run:
+```
+make libht.a CROSS_PREFIX=arm-linux-gnueabihf-
+```
