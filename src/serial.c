@@ -33,7 +33,7 @@ int32 serialRead(int32 fd, char *buffer, char start_byte, char end_byte, uint8 i
             Status = SERIAL_UART_SUCCESS;
 
             /* This will include the end byte in the message */
-            if (include_markers == SERIAL_INCLUDE_MARKETS) {
+            if (include_markers == SERIAL_INCLUDE_MARKERS) {
                 buffer[Index++] = aux;
 
                 /* Check if it is possible to add one more byte to end the message */
@@ -52,7 +52,7 @@ int32 serialRead(int32 fd, char *buffer, char start_byte, char end_byte, uint8 i
                 /* Start new message here normally */
                 hasMessage = true;
                 /* This will include the start byte in the message */
-                if (include_markers == SERIAL_INCLUDE_MARKETS) {
+                if (include_markers == SERIAL_INCLUDE_MARKERS) {
                     buffer[Index++] = aux;
                 }
             }

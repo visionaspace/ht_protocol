@@ -48,7 +48,7 @@ void ReadTask(void) {
     int32 Fd = serialOpen(SerialPort);
 
     while(1) {
-        bytes_read = serialRead(Fd, Buffer, HT_HW_START_CHAR, HT_HW_END_CHAR, SERIAL_INCLUDE_MARKETS, HT_MAX_MESSAGE_BYTES);
+        bytes_read = serialRead(Fd, Buffer, HT_HW_START_CHAR, HT_HW_END_CHAR, SERIAL_INCLUDE_MARKERS, HT_MAX_MESSAGE_BYTES);
         if (bytes_read > 0) {
             switch(HT_PROTOCOL_GetCmdId(Buffer)) {
 
