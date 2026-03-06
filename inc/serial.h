@@ -7,7 +7,7 @@
 
 /* UART definitions here */
 #define SERIAL_UART_NUM_BYTES_READ     1
-#define SERIAL_INCLUDE_MARKETS         127
+#define SERIAL_INCLUDE_MARKERS         127
 #define SERIAL_UART_SUCCESS            0
 
 /* UART Error definitions */
